@@ -1,6 +1,6 @@
 ---
 title: Projects
-icon: fas-code
+icon: fas fa-code
 order: 1
 ---
 
