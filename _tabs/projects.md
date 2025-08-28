@@ -1,7 +1,7 @@
 ---
 title: Projects
 icon: fas-code
-order: 2
+order: 1
 ---
 
 
