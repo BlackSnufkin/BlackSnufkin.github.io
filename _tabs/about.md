@@ -1,8 +1,27 @@
 ---
-# the default layout is 'page'
-icon: fas fa-info-circle
+title: About
+icon: fas fa-user
 order: 4
 ---
 
-> Add Markdown syntax content to file `_tabs/about.md`{: .filepath } and it will show up on this page.
+> Red team operator and security researcher.
+> This site is where I keep research notes, exploits, and experiments.  
+{: .prompt-warning }
+
+---
+
+## Focus
+- Vulnerability research  
+- Red team techniques  
+- Tool development  
+
+---
+
+## Why this blog
+> I’ve learned a lot from the security community.  
+> This space is my way to give something back — sharing notes and code that might help others.  
 {: .prompt-tip }
+
+
+All techniques are documented for educational purposes.
+{: .prompt-warning }
