@@ -12,7 +12,7 @@ order: 5
 ## Focus
 - Vulnerability research  
 - Red team techniques  
-- Tool development  
+- Malware development  
 
 ---
 
