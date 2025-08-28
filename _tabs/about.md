@@ -4,8 +4,7 @@ icon: fas fa-user
 order: 4
 ---
 
-> Red team operator and security researcher.
-> This site is where I keep research notes, exploits, and experiments.  
+> This site contains my research notes, exploits, and experiments  
 {: .prompt-info }
 
 ---
