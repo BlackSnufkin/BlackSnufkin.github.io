@@ -10,6 +10,12 @@
 #  icon: "fas fa-envelope"
 #  noblank: true # open link in current tab
 
+
+- type: discord
+  icon: "fas fa-discord"
+  url:  'https://discordapp.com/users/755827978214178897'
+  
+
 - type: rss
   icon: "fas fa-rss"
   noblank: true
