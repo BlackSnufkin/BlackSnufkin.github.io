@@ -26,6 +26,4 @@ order: 5
 {: .prompt-warning }
 
 
-![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png){: .w-25 .shadow .rounded }
-
-[Support me](https://www.buymeacoffee.com/blacksnufkin)
+[![Buy me a beer](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20beer&emoji=🍺&slug=blacksnufkin&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff)](https://www.buymeacoffee.com/blacksnufkin)
