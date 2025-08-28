@@ -26,4 +26,4 @@ order: 5
 {: .prompt-warning }
 
 
-[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://www.buymeacoffee.com/blacksnufkin){: .w-30 .shadow .rounded-10 }
+[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://www.buymeacoffee.com/blacksnufkin){: .w-15 .shadow .rounded-10 }
