@@ -24,3 +24,6 @@ order: 5
 
 > All techniques are documented for educational purposes.
 {: .prompt-warning }
+
+
+[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://www.buymeacoffee.com/blacksnufkin){: .w-30 .shadow .rounded-10 }
