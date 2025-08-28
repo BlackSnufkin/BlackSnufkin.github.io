@@ -6,7 +6,7 @@ order: 4
 
 > Red team operator and security researcher.
 > This site is where I keep research notes, exploits, and experiments.  
-{: .prompt-warning }
+{: .prompt-info }
 
 ---
 
@@ -23,5 +23,5 @@ order: 4
 {: .prompt-tip }
 
 
-All techniques are documented for educational purposes.
+> All techniques are documented for educational purposes.
 {: .prompt-warning }
