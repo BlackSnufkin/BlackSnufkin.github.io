@@ -9,10 +9,10 @@ order: 5
 
 ---
 
-## Focus
-- Vulnerability research  
-- Red team techniques  
-- Malware development  
+## Things I Like
+- [x] Vulnerability research  
+- [x] Red team techniques  
+- [x] Malware development  
 
 ---
 
