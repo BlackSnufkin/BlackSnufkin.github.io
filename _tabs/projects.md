@@ -9,6 +9,7 @@ order: 1
 ![logo-patt](https://github.com/user-attachments/assets/20030454-55b8-4473-b7b7-f65bb7150d51){: .w-100 .shadow .rounded-10 }
 
 * 🖥️ [BYOVD](https://github.com/BlackSnufkin/BYOVD) - BYOVD use cases for vulnerable driver analysis and reverse engineering
+![](https://github.com/user-attachments/assets/3d4b6944-770c-47c8-883b-f4d9bb90eb4d){: .w-100 .shadow .rounded-10 }
 
 
 ### Other Projects
