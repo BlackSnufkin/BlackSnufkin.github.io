@@ -1,6 +1,6 @@
 ---
 title: "OPSEC: Read the Code Before It Burns Your Op"
-date: 2025-09-07 13:00:00 +0300
+date: 2025-09-09 13:00:00 +0300
 categories: [OPSEC]
 tags: [OPSEC, Detection, IOCs]
 ---
