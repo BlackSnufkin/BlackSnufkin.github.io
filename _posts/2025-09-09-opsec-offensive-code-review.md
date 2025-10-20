@@ -69,6 +69,22 @@ The psexec module creates named pipes with consistent patterns and contains a sp
 
 The primary communication pipe uses "communicaton" instead of "communication". This identifier appears in named pipe creation events and SMB traffic analysis, providing definitive tool attribution.
 
+
+### Impacket: SMB Challenge Value
+
+Impacket is a Python library for network protocol implementation. The SimpleSMBServer class provides SMB server functionality used by smbserver.py and ntlmrelayx relay operations.
+
+Server initialization hardcodes the NTLM challenge value:
+
+![](/assets/posts/2025-09-09-OPSEC-OFFENSIVE-CODE-REVIEW/impacket-smb_server_challenge.png)
+
+This produces `4141414141414141` in NTLMSSP_CHALLENGE messages during every authentication handshake. The constant appears in network traffic analysis, packet captures, and IDS/IPS monitoring of SMB authentication flows.
+
+![](/assets/posts/2025-09-09-OPSEC-OFFENSIVE-CODE-REVIEW/impacket-smb_server_challenge_2.png)
+
+The smbserver.py script includes a `setSMBChallenge()` method for customization, but most operators use default configurations. Setting an empty string through this method still results in the hardcoded value being used.
+
+
 ### ROADtools: Device Authentication Domain
 
 ROADtools is a framework for Azure AD security research and testing. The `DeviceAuthentication` class handles device registration and Primary Refresh Token (PRT) operations for Azure AD environments.
