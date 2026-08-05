@@ -376,6 +376,8 @@ Trust the wrong code at the kernel boundary and the trust model inverts.
 
 ## PoC
 
+Source: **[github.com/BlackSnufkin/AxHunter — axhunter_v1](https://github.com/BlackSnufkin/AxHunter/tree/main/axhunter_v1)**.
+
 Full chain in action — three `WriteFile` calls, then an interactive SYSTEM shell:
 
 <video controls width="100%">

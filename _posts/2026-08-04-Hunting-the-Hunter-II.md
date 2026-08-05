@@ -476,6 +476,8 @@ Every impact reached from a standard user token on a fully-patched machine with 
 
 ## PoC
 
+Source: **[github.com/BlackSnufkin/AxHunter — axhunter_v2](https://github.com/BlackSnufkin/AxHunter/tree/main/axhunter_v2)**.
+
 Full chain against v2026.6.1.192 — three auth layers bypassed, PPL primitives reached:
 
 <video controls width="100%">
