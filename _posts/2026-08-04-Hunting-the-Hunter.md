@@ -2,7 +2,7 @@
 title: "Hunting the Hunter: A Live Kernel LPE 0day in Anti-Cheat on a Billion Machines"
 date: 2026-08-04
 author: BlackSnufkin
-tags: [BYOVD, Reverse-Engineering, LPE, Cred-Dump, Process-Kill]
+tags: [0Day, BYOVD, Reverse-Engineering, LPE, Cred-Dump, Process-Kill]
 ---
 
 ## TL;DR
