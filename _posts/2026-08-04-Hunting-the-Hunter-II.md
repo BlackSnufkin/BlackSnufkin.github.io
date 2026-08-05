@@ -2,7 +2,7 @@
 title: "Hunting the Hunter II: Reversing xhunter2.sys and Its Three-Layer Authentication"
 date: 2026-08-04
 author: BlackSnufkin
-tags: [reverse-engineering, kernel, anti-cheat, xigncode3, auth-bypass, CVE]
+tags: [BYOVD, Reverse-Engineering, LPE, Cred-Dump, Process-Kill, CVE]
 ---
 
 ## TL;DR
