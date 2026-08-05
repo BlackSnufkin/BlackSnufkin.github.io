@@ -374,6 +374,17 @@ Trust the wrong code at the kernel boundary and the trust model inverts.
 
 ---
 
+## PoC
+
+Full chain in action — three `WriteFile` calls, then an interactive SYSTEM shell:
+
+<video controls width="100%">
+  <source src="{{ '/assets/posts/2026-08-04-Hunting-the-Hunter/HTH-I-XHunter-v2023.mp4' | relative_url }}" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+---
+
 ## The remediation that wasn't
 
 Wellbia did respond. Their answer to this class of issue wasn't a follow-up patch to `xhunter1.sys` — it was a full driver rewrite, `xhunter2.sys` v2026.6.1.192, shipping in newer XIGNCODE3-protected titles including *WindSlayer*. New protocol, new frame format, encrypted transport, three independent cryptographic authentication layers wrapping every dispatch handler. Real engineering effort. On paper it looks like the right kind of response.

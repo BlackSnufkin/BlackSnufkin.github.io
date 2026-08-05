@@ -474,6 +474,17 @@ Every impact reached from a standard user token on a fully-patched machine with 
 
 ---
 
+## PoC
+
+Full chain against v2026.6.1.192 — three auth layers bypassed, PPL primitives reached:
+
+<video controls width="100%">
+  <source src="{{ '/assets/posts/2026-08-04-Hunting-the-Hunter-II/HTH-II-XHunter-v2026.mp4' | relative_url }}" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+---
+
 ## What the RE showed
 
 Wellbia's response to CVE-2026-3609 was an auth gate. *Hunting the Hunter* showed that gate defended one side of a shared trust state. The response to *that* was a full protocol rewrite with three cryptographic auth layers. Each layer, taken by itself, looks like a well-formed security boundary — real 2048-bit RSA, real signatures, real kernel data structures with mutex-serialized walks. Taken together they raise the reversing cost meaningfully, and change nothing about who can eventually reach the primitives on the other side.
