@@ -11,7 +11,7 @@ tags: [BYOVD, Reverse-Engineering, LPE, Cred-Dump, Process-Kill, CVE]
 - Wellbia's response to *Hunting the Hunter* was a full kernel driver rewrite: `xhunter2.sys` (v2026.6.1.192), shipping in 2026 XIGNCODE3-protected PC titles including *WindSlayer*. The rewrite is real — new protocol, new frame format, encrypted transport, three independent cryptographic authentication layers wrapping the dispatch table.
 - This post is the reverse-engineering diary of how those three layers were reversed cold and defeated. It's about the RE process, not the exploit. The same three primitives from *Hunting the Hunter* sit behind the new auth stack (cmd 785 / cmd 787 / cmd 800) and this post does not re-cover them — they are byte-for-byte the code from the previous post, unchanged.
 - Three auth layers, three bypasses: (1) a **WBMF** RSA-signed PE fingerprint check at `IRP_MJ_CREATE` combined with a Win32StartAddress check on the calling thread, (2) a **WBCC** per-request certificate blob with its own re-verification and chain iteration, and (3) a kernel-side **PID flag gate** that requires the caller to be in an allowlist with a specific bit mask. All three fall to the same class of realization: identity is being proven by possession of an artifact that lives in game memory or is settable by unauthenticated opcodes.
-- Same three impacts as *Hunting the Hunter* hold end-to-end on Windows 11 24H2 build 26200 with HVCI + VBS + MS VDBL all on. This post covers *why* they still work in the v2026 driver track.
+- Same three impacts as *Hunting the Hunter* hold end-to-end on Windows 11 25H2 (build 26200.8457) with HVCI + VBS + MS VDBL all on. This post covers *why* they still work in the v2026 driver track.
 
 ---
 
@@ -32,7 +32,7 @@ Product       XIGNCODE3 — Wellbia (2026 build track)
 Architecture  x86-64 Windows kernel driver
 Device        \Device\xhunter2          (DO_BUFFERED_IO, no \DosDevices\ symlink)
 Signature     Wellbia + Microsoft WHQL  (Hardware Compatibility Publisher)
-Tested        Windows 11 24H2 build 26200, HVCI + VBS + MS VDBL all enabled
+Tested        Windows 11 25H2, build 26200.8457, HVCI + VBS + MS VDBL all enabled
 ```
 
 First fact: **no `DeviceIoControl`.** The driver's `MajorFunction` table hooks `IRP_MJ_CREATE`, `IRP_MJ_CLOSE`, and `IRP_MJ_WRITE`. Every command is a write. That is already a small mitigation against generic IOCTL fuzzers, but the more consequential thing is that the framing on those writes is not obvious from imports alone — you have to reverse it before any handler decompile is meaningful.
@@ -456,7 +456,7 @@ At the end of that chain the dispatch table is fully addressable from an unprivi
 
 ## What that gets you
 
-The three impacts from *Hunting the Hunter* still hold on `xhunter2.sys` v2026.6.1.192 tested on Windows 11 24H2 build 26200 with HVCI + VBS + Microsoft's Vulnerable Driver Blocklist all enabled. The commands used are documented in the previous post — this one doesn't re-cover them.
+The three impacts from *Hunting the Hunter* still hold on `xhunter2.sys` v2026.6.1.192 tested on Windows 11 25H2 (build 26200.8457) with HVCI + VBS + Microsoft's Vulnerable Driver Blocklist all enabled. The commands used are documented in the previous post — this one doesn't re-cover them.
 
 ### Credential dump from PPL `lsass.exe`
 
@@ -464,7 +464,7 @@ After the auth stack is bypassed and cmd 785 opens a `PROCESS_ALL_ACCESS` handle
 
 ### Kill PPL-Antimalware-Light `MsMpEng.exe`
 
-Cmd 785 on `MsMpEng.exe` for the kernel-minted handle, cmd 791 (`ZwQueryInformationProcess(ProcessHandleInformation=51)`) for a snapshot of the target's own handle table (queried in kernel context, so PPL doesn't apply), cmd 800 for each handle to strip `ProtectFromClose` and `ZwClose` inside the attached target. Enough critical handles closed → Defender terminates. SCM restarts it on a fresh PID; the original PPL instance is gone. Confirmed no BSOD on Win11 24H2 build 26200.
+Cmd 785 on `MsMpEng.exe` for the kernel-minted handle, cmd 791 (`ZwQueryInformationProcess(ProcessHandleInformation=51)`) for a snapshot of the target's own handle table (queried in kernel context, so PPL doesn't apply), cmd 800 for each handle to strip `ProtectFromClose` and `ZwClose` inside the attached target. Enough critical handles closed → Defender terminates. SCM restarts it on a fresh PID; the original PPL instance is gone. Confirmed no BSOD on Win11 25H2 (build 26200.8457).
 
 ### Interactive SYSTEM shell via `winlogon.exe`
 
