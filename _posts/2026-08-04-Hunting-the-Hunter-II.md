@@ -2,16 +2,16 @@
 title: "Hunting the Hunter II: Reversing xhunter2.sys and Its Three-Layer Authentication"
 date: 2026-08-04
 author: BlackSnufkin
-tags: [BYOVD, Reverse-Engineering, LPE, Cred-Dump, Process-Kill, CVE]
+tags: [BYOVD, Reverse-Engineering, LPE, Cred-Dump, Process-Kill, Code-Injection, CVE]
 ---
 
 ## TL;DR
 
-- **[CVE-2026-15430](https://www.cve.org/CVERecord?id=CVE-2026-15430)** — improper access control in `xhunter2.sys` v2026.6.1.192 (Wellbia XIGNCODE3). The previous driver — `xhunter1.sys` v2023.12.7.78, covered in *[Hunting the Hunter](https://blacksnufkin.github.io/posts/Hunting-the-Hunter/)* and still shipping in the majority of XIGNCODE3-protected titles — has no CVE assigned.
+- **[CVE-2026-15430](https://www.cve.org/CVERecord?id=CVE-2026-15430)** — improper access control in `xhunter2.sys` v2026.6.1.192 (Wellbia XIGNCODE3). The previous driver — `xhunter1.sys` v2023.12.7.78, covered in *[Hunting the Hunter](https://blacksnufkin.github.io/posts/Hunting-the-Hunter/)* and still shipping in the majority of XIGNCODE3-protected titles — is now covered by **[CVE-2026-3609](https://www.cve.org/CVERecord?id=CVE-2026-3609)** (updated 2026-08-05 to include *"version 10.0.10011.16384 through 2023.12.7.78"*).
 - Wellbia's response to *Hunting the Hunter* was a full kernel driver rewrite: `xhunter2.sys` (v2026.6.1.192), shipping in 2026 XIGNCODE3-protected PC titles including *WindSlayer*. The rewrite is real — new protocol, new frame format, encrypted transport, three independent cryptographic authentication layers wrapping the dispatch table.
-- This post is the reverse-engineering diary of how those three layers were reversed cold and defeated. It's about the RE process, not the exploit. The same three primitives from *Hunting the Hunter* sit behind the new auth stack (cmd 785 / cmd 787 / cmd 800) and this post does not re-cover them — they are byte-for-byte the code from the previous post, unchanged.
+- This post is the reverse-engineering diary of how those three layers were reversed cold and defeated. It's about the RE process, not the exploit. The same primitives from *Hunting the Hunter* sit behind the new auth stack (cmd 785 / cmd 787 / cmd 800 / cmd 820) and this post does not re-cover them — they are byte-for-byte the code from the previous post, unchanged.
 - Three auth layers, three bypasses: (1) a **WBMF** RSA-signed PE fingerprint check at `IRP_MJ_CREATE` combined with a Win32StartAddress check on the calling thread, (2) a **WBCC** per-request certificate blob with its own re-verification and chain iteration, and (3) a kernel-side **PID flag gate** that requires the caller to be in an allowlist with a specific bit mask. All three fall to the same class of realization: identity is being proven by possession of an artifact that lives in game memory or is settable by unauthenticated opcodes.
-- Same three impacts as *Hunting the Hunter* hold end-to-end on Windows 11 25H2 (build 26200.8457) with HVCI + VBS + MS VDBL all on. This post covers *why* they still work in the v2026 driver track.
+- Same four impacts as *Hunting the Hunter* hold end-to-end on Windows 11 25H2 (build 26200.8457) with HVCI + VBS + MS VDBL all on — including kernel-mode code injection via cmd 820. This post covers *why* they still work in the v2026 driver track.
 
 ---
 
@@ -19,7 +19,7 @@ In the companion post, *[Hunting the Hunter](https://blacksnufkin.github.io/post
 
 Wellbia's answer wasn't a hotfix. It was a next-generation kernel driver, `xhunter2.sys`, delivered inside the 2026 XIGNCODE3 build cycle. New protocol, new frame format, encrypted transport, three cryptographic authentication layers wrapping every dispatch handler. It is a real engineering effort and it visibly costs the attacker something — the reversing bar to touch the primitives is significantly higher than in the previous driver.
 
-The primitives themselves — the three opcodes from *Hunting the Hunter* that turn `cmd 785` into a PPL handle mint, `cmd 787` into a cross-process byte-copy read, and `cmd 800` into a handle stomp on any target — are still there, byte-for-byte. I'm not re-covering them. They live in the previous post. This one is only about how the three auth layers were reverse-engineered and defeated, so an unprivileged caller can once again reach the dispatch table on the other side.
+The primitives themselves — the four opcodes from *Hunting the Hunter* that turn `cmd 785` into a PPL handle mint, `cmd 787` into a cross-process byte-copy read, `cmd 800` into a handle stomp on any target, and `cmd 820` into a kernel-mode code injector (RWX alloc + `RtlCreateUserThread`, all ring 0) — are still there, byte-for-byte. I'm not re-covering them. They live in the previous post. This one is only about how the three auth layers were reverse-engineered and defeated, so an unprivileged caller can once again reach the dispatch table on the other side.
 
 ---
 
@@ -277,9 +277,10 @@ pe + 0x500  → open_worker       (device open)
 pe + 0x520  → kill_worker       (impact A)
 pe + 0x540  → dump_worker       (impact B)
 pe + 0x560  → lpe_worker        (impact C)
+pe + 0x580  → inject_worker     (impact D)
 ```
 
-Four trampolines, four workers, four `CreateThread` calls. Each worker's `Win32StartAddress` is inside the WBMF PE. Every one of them can send WRITEs that pass layer 2.
+Five trampolines, five workers, five `CreateThread` calls. Each worker's `Win32StartAddress` is inside the WBMF PE. Every one of them can send WRITEs that pass layer 2.
 
 ---
 
@@ -450,13 +451,13 @@ The path from cold binary to "the driver dispatches our opcodes" ended up being:
 
 Every constraint the driver imposes turned into a piece of the harness. WBMF signature ⇒ carve real DLL. Win32StartAddress ⇒ trampolines. WBCC per-request ⇒ pre-built blob with `count=0`. PID gate ⇒ three-opcode escalation. Encrypted transport ⇒ LCG-XOR wrapper around every request/response.
 
-At the end of that chain the dispatch table is fully addressable from an unprivileged process. Everything past this point is the *Hunting the Hunter* payload playing out, unchanged.
+At the end of that chain the dispatch table is fully addressable from an unprivileged process. Everything past this point is the *Hunting the Hunter* payload playing out, unchanged — now including kernel-mode code injection via cmd 820.
 
 ---
 
 ## What that gets you
 
-The three impacts from *Hunting the Hunter* still hold on `xhunter2.sys` v2026.6.1.192 tested on Windows 11 25H2 (build 26200.8457) with HVCI + VBS + Microsoft's Vulnerable Driver Blocklist all enabled. The commands used are documented in the previous post — this one doesn't re-cover them.
+The four impacts from *Hunting the Hunter* still hold on `xhunter2.sys` v2026.6.1.192 tested on Windows 11 25H2 (build 26200.8457) with HVCI + VBS + Microsoft's Vulnerable Driver Blocklist all enabled. The commands used are documented in the previous post — this one doesn't re-cover them.
 
 ### Credential dump from PPL `lsass.exe`
 
@@ -470,6 +471,10 @@ Cmd 785 on `MsMpEng.exe` for the kernel-minted handle, cmd 791 (`ZwQueryInformat
 
 Cmd 785 on `winlogon.exe` — the returned handle carries every access bit because it was minted `KernelMode`. From user mode, standard `VirtualAllocEx` + `WriteProcessMemory` + `CreateRemoteThread` against that handle, running a 41-byte shellcode that calls `WinExec("cmd.exe /c start cmd.exe", SW_SHOW)`. The child `cmd.exe` inherits winlogon's `NT AUTHORITY\SYSTEM` token and Session 1, so an interactive SYSTEM console appears on the user's desktop. `WinExec`'s address is resolved locally — per-boot ASLR makes kernel32's base identical across processes on the same boot.
 
+### Kernel-mode code injection
+
+Cmd 820 is a kernel-side injection primitive: the driver allocates RWX memory in the target process, copies the caller's shellcode into it, and spawns a thread with `RtlCreateUserThread` — all from ring 0. Combined with a cmd 785 handle, the caller can inject arbitrary code into any process regardless of protection level, without touching user-mode allocation APIs. EDR hooks on `VirtualAllocEx` / `NtAllocateVirtualMemory` never fire because the entire alloc → copy → execute chain happens in the kernel.
+
 Every impact reached from a standard user token on a fully-patched machine with the current Microsoft Vulnerable Driver Blocklist active.
 
 ---
@@ -478,7 +483,7 @@ Every impact reached from a standard user token on a fully-patched machine with 
 
 Source: **[github.com/BlackSnufkin/AxHunter — axhunter_v2](https://github.com/BlackSnufkin/AxHunter/tree/main/axhunter_v2)**.
 
-Full chain against v2026.6.1.192 — three auth layers bypassed, PPL primitives reached:
+Full chain against v2026.6.1.192 — three auth layers bypassed, four impact modes (dump, kill, lpe, inject):
 
 <video controls width="100%">
   <source src="{{ '/assets/posts/2026-08-04-Hunting-the-Hunter-II/HTH-II-XHunter-v2026.mp4' | relative_url }}" type="video/mp4">
@@ -489,7 +494,7 @@ Full chain against v2026.6.1.192 — three auth layers bypassed, PPL primitives 
 
 ## What the RE showed
 
-Wellbia's response to CVE-2026-3609 was an auth gate. *Hunting the Hunter* showed that gate defended one side of a shared trust state. The response to *that* was a full protocol rewrite with three cryptographic auth layers. Each layer, taken by itself, looks like a well-formed security boundary — real 2048-bit RSA, real signatures, real kernel data structures with mutex-serialized walks. Taken together they raise the reversing cost meaningfully, and change nothing about who can eventually reach the primitives on the other side.
+Wellbia's response to CVE-2026-3609 was an auth gate. *Hunting the Hunter* showed that gate defended one side of a shared trust state. The response to *that* was a full protocol rewrite with three cryptographic auth layers. Each layer, taken by itself, looks like a well-formed security boundary — real 2048-bit RSA, real signatures, real kernel data structures with mutex-serialized walks. Taken together they raise the reversing cost meaningfully, and change nothing about who can eventually reach the four primitives on the other side.
 
 The RE process itself took most of a week — most of it spent reversing framing and encryption before any handler decompile was useful, and a good chunk spent understanding why WBMF wouldn't validate anything until I realized the module wasn't on disk. Each layer needed a distinct piece of engineering to defeat: memory extraction for layer 1, protocol-level trick for layer 2, dispatch-table trust-flow analysis for layer 3. No memory corruption. No implementation bug. The layers were reverse-engineered and defeated by reading the code and following what it actually trusts.
 
@@ -503,10 +508,9 @@ The driver checks whether the caller possesses a valid artifact. It never checks
 
 This vulnerability is tracked as **[CVE-2026-15430](https://www.cve.org/CVERecord?id=CVE-2026-15430)**, published 2026-08-03.
 
-Two related XIGNCODE3 drivers sit alongside it:
+One related CVE covers the predecessor driver:
 
-- **[CVE-2026-3609](https://www.cve.org/CVERecord?id=CVE-2026-3609)** — the legacy `xhunter1.sys` v10.0.10011.16384 build. See the [original write-up](https://blacksnufkin.github.io/posts/AntiCheat-LPE-CVE-2026-3609/).
-- **`xhunter1.sys` v2023.12.7.78** — Wellbia's 2023 remediation of CVE-2026-3609, covered in *[Hunting the Hunter](https://blacksnufkin.github.io/posts/Hunting-the-Hunter/)*. **No CVE assigned.** This is the driver most XIGNCODE3-protected titles actually load — roughly 150 games across the industry — and defenders searching NVD or cve.org for a matching identifier today find nothing.
+- **[CVE-2026-3609](https://www.cve.org/CVERecord?id=CVE-2026-3609)** — `xhunter1.sys` v10.0.10011.16384 through v2023.12.7.78. Originally covered the legacy 10.x build only; CERT/CC updated the description on 2026-08-05 to include the current production binary covered in *[Hunting the Hunter](https://blacksnufkin.github.io/posts/Hunting-the-Hunter/)*. See the [original write-up](https://blacksnufkin.github.io/posts/AntiCheat-LPE-CVE-2026-3609/) for the legacy build.
 
 The primitives that make the impacts possible (cmd 785, cmd 787, cmd 800) are architecturally the same as in the earlier CVE. What's new in `xhunter2.sys` is the three-layer authentication mechanism documented above — an RSA-signed device-open token (WBMF), a per-request certificate chain (WBCC), and a per-PID flag gate — all of which can be satisfied by any caller in possession of a signed static artifact distributed with the product.
 

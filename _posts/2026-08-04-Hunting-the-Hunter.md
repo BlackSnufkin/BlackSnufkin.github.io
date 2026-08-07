@@ -2,18 +2,19 @@
 title: "Hunting the Hunter: A Live Kernel LPE 0day in Anti-Cheat on a Billion Machines"
 date: 2026-08-04
 author: BlackSnufkin
-tags: [0Day, BYOVD, Reverse-Engineering, LPE, Cred-Dump, Process-Kill]
+tags: [0Day, BYOVD, Reverse-Engineering, LPE, Cred-Dump, Process-Kill, Code-Injection]
 ---
 
 ## TL;DR
 
 - **Local privilege escalation** in current production `xhunter1.sys` v2023.12.7.78, the kernel driver behind XIGNCODE3 anti-cheat. Standard user account → interactive SYSTEM shell via three `WriteFile` calls.
-- **No CVE assigned.** Two other XIGNCODE3 drivers carry CVEs — [CVE-2026-3609](https://www.cve.org/CVERecord?id=CVE-2026-3609) for the legacy 10.x build and [CVE-2026-15430](https://www.cve.org/CVERecord?id=CVE-2026-15430) for Wellbia's follow-up rewrite `xhunter2.sys` — but no CVE identifier was issued for v2023.12.7.78 itself. This is the driver most XIGNCODE3-protected titles actually load — roughly 150 games across the industry — and defenders searching NVD or cve.org for a matching identifier today find nothing.
+- **[CVE-2026-3609](https://www.cve.org/CVERecord?id=CVE-2026-3609)** now covers this driver. CERT/CC updated the CVE description on 2026-08-05 to read *"version 10.0.10011.16384 through 2023.12.7.78"*, extending coverage from the legacy 10.x build to include the current production binary documented in this post.
 - **The hash below is one of many.** Wellbia rebuilds and re-signs `xhunter1.sys` per-title. The SHA-256 in the driver metadata block is the specific sample I reversed, extracted from one XIGNCODE3-protected Steam title. Other games ship binaries with different hashes, different timestamps, sometimes different embedded signing certificates — all v2023.12.7.78, all vulnerable to the same chain documented below. Anyone building a hash blocklist against this bug needs to canvas the full title catalog, not this one hash.
 - **Signed by Wellbia and Microsoft.** The driver carries Microsoft's WHQL signature ("Microsoft Windows Hardware Compatibility Publisher") and loads cleanly on a fully-patched **Windows 11 25H2 (build 26200.8457)** with HVCI, VBS, and Microsoft's Vulnerable Driver Blocklist all enabled. None of them block this bug.
 - **One billion daily users**, per Wellbia's own marketing. The driver loads when you run any of 150+ affected PC titles — Black Desert, Lineage II, MapleStory (SEA/JMS), AION, Blade & Soul, and others — and stays on disk after uninstall.
-- **Three primitives from one bug:** credential dump from `lsass.exe`, EDR kill on `MsMpEng.exe`, and an interactive SYSTEM shell in the user's session.
+- **Four primitives from one bug:** credential dump from `lsass.exe`, EDR kill on `MsMpEng.exe`, interactive SYSTEM shell in the user's session, and kernel-mode code injection into any process (including PPL) via cmd 820.
 - **Wellbia's attempted remediation failed.** Their response to this class of issue was a full driver rewrite (`xhunter2.sys`, v2026.6.1.192) shipping in newer XIGNCODE3-protected titles including *WindSlayer*. The rewrite added three cryptographic authentication layers around the same vulnerable primitives; all three layers were bypassed. See the follow-up: *[Hunting the Hunter II](https://blacksnufkin.github.io/posts/Hunting-the-Hunter-II/)*.
+- **Update (2026-08-05):** CERT/CC updated **[CVE-2026-3609](https://www.cve.org/CVERecord?id=CVE-2026-3609)** to cover *"version 10.0.10011.16384 through 2023.12.7.78"*, extending the identifier to include the production build documented in this post. Defenders keying on CVE identifiers now have an anchor for this driver.
 
 ---
 
@@ -291,9 +292,9 @@ The dispatch handler that *reads* the allowlist got hardened. The two that *writ
 
 ---
 
-## Three primitives, one chain
+## Four primitives, one chain
 
-Three distinct capabilities from a standard user account against a signed, vendor-current Wellbia binary.
+Four distinct capabilities from a standard user account against a signed, vendor-current Wellbia binary.
 
 First, one structural property worth calling out, because it separates this from most BYOVD literature:
 
@@ -358,6 +359,12 @@ Close enough handles in a PPL target and the kernel objects it depends on get ri
 
 The kernel-minted handle from `cmd 785` carries every right bit, including `PROCESS_VM_OPERATION`, `PROCESS_VM_WRITE`, and `PROCESS_CREATE_THREAD`. `VirtualAllocEx` / `WriteProcessMemory` / `CreateRemoteThread` from user-mode do their secondary access checks against the handle's `GrantedAccess` — and because the handle was minted in `KernelMode`, those checks treat the caller as authorized. Even injection into PPL `winlogon.exe` works. The child `cmd.exe` inherits winlogon's primary `NT AUTHORITY\SYSTEM` token *and* its Session 1, so you get an interactive SYSTEM shell on the user's desktop without any admin token in the calling process. Verified on a fully-patched Windows 11 25H2 system (build 26200.8457) with HVCI and the Microsoft Vulnerable Driver Blocklist enabled.
 
+### 4. Kernel-mode code injection via cmd 820
+
+Command **`0x334` / `820`** is a kernel-side injection primitive. The driver allocates RWX memory in the target process via the kernel allocator, copies the caller's shellcode into it, and spawns a thread with `RtlCreateUserThread` — all from ring 0. No `VirtualAllocEx` / `WriteProcessMemory` / `CreateRemoteThread` from user mode, no secondary access checks against the handle's `GrantedAccess`. Combined with a `cmd 785` handle on a PPL target, the caller can inject arbitrary code into any process regardless of protection level. The sentinel protocol at the end of the payload buffer lets the caller detect thread completion.
+
+This is strictly more powerful than the user-mode injection in primitive 3: it doesn't touch user-mode allocation APIs, so EDR hooks on `VirtualAllocEx` / `NtAllocateVirtualMemory` in user mode never fire. The entire alloc → copy → execute chain happens in the kernel.
+
 The chain itself isn't novel. What's novel is who provides the entry point. This isn't a third-party driver being repurposed as a BYOVD primitive after the fact — this is the anti-cheat, a signed kernel component installed under the OS directory by a security vendor, handing out the exact primitive defenders spend serious engineering time trying to prevent.
 
 ---
@@ -378,7 +385,7 @@ Trust the wrong code at the kernel boundary and the trust model inverts.
 
 Source: **[github.com/BlackSnufkin/AxHunter — axhunter_v1](https://github.com/BlackSnufkin/AxHunter/tree/main/axhunter_v1)**.
 
-Full chain in action — three `WriteFile` calls, then an interactive SYSTEM shell:
+Full chain in action — three `WriteFile` calls, then four impact modes (dump, kill, lpe, inject):
 
 <video controls width="100%">
   <source src="{{ '/assets/posts/2026-08-04-Hunting-the-Hunter/HTH-I-XHunter-v2023.mp4' | relative_url }}" type="video/mp4">
@@ -400,16 +407,15 @@ In practice the same three primitives from this post (cmd 785, cmd 787, cmd 800)
 Two important operational facts:
 
 - `xhunter2.sys` ships in a small subset of XIGNCODE3 titles (most notably *WindSlayer*). The overwhelming majority of the ~150 XIGNCODE3-protected games in the wild — the "billion daily users" footprint — still load **`xhunter1.sys` v2023.12.7.78**, the driver documented in this post.
-- The driver documented in this post has no CVE assigned. `xhunter2.sys` got a CVE; the legacy 10.x build (CVE-2026-3609) got a CVE. The build in the middle — the one on the widest install base and the one this post is about — got neither. Defender-side inventory and blocklist tooling that keys on CVE identifiers has no anchor for this driver.
+- **Update (2026-08-05):** CERT/CC extended **[CVE-2026-3609](https://www.cve.org/CVERecord?id=CVE-2026-3609)** to cover *"version 10.0.10011.16384 through 2023.12.7.78"*. This driver now has a CVE anchor for defender-side inventory and blocklist tooling.
 
 ---
 
 ## CVE references
 
-Three XIGNCODE3 kernel drivers, one class of vulnerability:
+Two CVEs, one class of vulnerability spanning three XIGNCODE3 kernel drivers:
 
-- **[CVE-2026-3609](https://www.cve.org/CVERecord?id=CVE-2026-3609)** — the legacy `xhunter1.sys` v10.0.10011.16384 build. See the [original write-up](https://blacksnufkin.github.io/posts/AntiCheat-LPE-CVE-2026-3609/).
-- **`xhunter1.sys` v2023.12.7.78** — covered in **this post**. **No CVE assigned.** This is the driver most XIGNCODE3-protected titles actually load — roughly 150 games across the industry — and defenders searching NVD or cve.org for a matching identifier today find nothing.
+- **[CVE-2026-3609](https://www.cve.org/CVERecord?id=CVE-2026-3609)** — `xhunter1.sys` v10.0.10011.16384 through v2023.12.7.78. Originally covered the legacy 10.x build only; CERT/CC updated the description on 2026-08-05 to include the current production binary documented in this post. See the [original write-up](https://blacksnufkin.github.io/posts/AntiCheat-LPE-CVE-2026-3609/) for the legacy build and this post for the v2023 auth-gate bypass.
 - **[CVE-2026-15430](https://www.cve.org/CVERecord?id=CVE-2026-15430)** — `xhunter2.sys` v2026.6.1.192, the rewritten driver shipping in a small subset of newer titles (most notably *WindSlayer*). Full technical breakdown, including the three-layer cryptographic authentication mechanism and its bypass: **[Hunting the Hunter II](https://blacksnufkin.github.io/posts/Hunting-the-Hunter-II/)**.
 
 The driver is not distributed as a standalone artifact. It loads when the user runs any XIGNCODE3-protected title.
